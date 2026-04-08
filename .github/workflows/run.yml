@@ -2,7 +2,7 @@ name: Scholarship Checker
 
 on:
   schedule:
-    - cron: '30 18 * * *'   # 12:00 AM IST
+    - cron: '30 18 * * *'   # 12:00 AM IST every day
   workflow_dispatch:
 
 jobs:
@@ -23,7 +23,6 @@ jobs:
       - name: Install dependencies
         run: pip install selenium twilio
 
-      # ✅ This is the correct way to install Chrome on ubuntu-latest
       - name: Install Chrome
         run: |
           sudo apt-get update
@@ -43,7 +42,7 @@ jobs:
           APPLICATION_NUMBER: ${{ secrets.APPLICATION_NUMBER }}
         run: python script.py
 
-      - name: "Wait 1hr → Retry attempt 2"
+      - name: "Wait 1hr -> Retry attempt 2"
         if: steps.attempt1.outcome == 'failure'
         id: attempt2
         continue-on-error: true
@@ -54,7 +53,7 @@ jobs:
           APPLICATION_NUMBER: ${{ secrets.APPLICATION_NUMBER }}
         run: sleep 3600 && python script.py
 
-      - name: "Wait 1hr → Retry attempt 3"
+      - name: "Wait 1hr -> Retry attempt 3"
         if: steps.attempt2.outcome == 'failure'
         id: attempt3
         continue-on-error: true
@@ -65,7 +64,7 @@ jobs:
           APPLICATION_NUMBER: ${{ secrets.APPLICATION_NUMBER }}
         run: sleep 3600 && python script.py
 
-      - name: "Wait 1hr → Retry attempt 4 (final)"
+      - name: "Wait 1hr -> Retry attempt 4 (final)"
         if: steps.attempt3.outcome == 'failure'
         env:
           ACCOUNT_SID: ${{ secrets.ACCOUNT_SID }}
@@ -73,3 +72,10 @@ jobs:
           TO_WHATSAPP: ${{ secrets.TO_WHATSAPP }}
           APPLICATION_NUMBER: ${{ secrets.APPLICATION_NUMBER }}
         run: sleep 3600 && python script.py
+
+      - name: Upload error screenshot
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: error-screenshot
+          path: error_screenshot.png
