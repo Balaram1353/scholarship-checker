@@ -61,7 +61,7 @@ def check_status():
     options.binary_location = "/usr/bin/google-chrome"
 
     driver = webdriver.Chrome(options=options)
-    wait = WebDriverWait(driver, 20)
+    wait = WebDriverWait(driver, 30)
 
     try:
         print(f"Opening URL: {URL}")
@@ -91,19 +91,31 @@ def check_status():
 
         time.sleep(2)
 
-        # DEBUG - confirm XPATH is matching correctly
-        elements = driver.find_elements(By.XPATH, "//td[contains(text(),'Bank Remitted Date')]/b")
-        print("Matched elements count:", len(elements))
-        for el in elements:
-            print("Found text:", el.text)
+        bank_date = ""
 
+        # The HTML structure is:
+        # <td>Bank Remitted Date : <b>30-11-2022</b></td>
+        # So we find the <td> that contains "Bank Remitted Date"
+        # then get the <b> tag inside it
         try:
             bank_date = driver.find_element(
                 By.XPATH,
                 "//td[contains(text(),'Bank Remitted Date')]/b"
             ).text.strip()
+            print("Bank Remitted Date found:", bank_date)
         except:
-            bank_date = ""
+            # fallback - search all td elements for Bank Remitted Date text
+            try:
+                tds = driver.find_elements(By.TAG_NAME, "td")
+                for td in tds:
+                    if "Bank Remitted Date" in td.text:
+                        b_tags = td.find_elements(By.TAG_NAME, "b")
+                        if b_tags:
+                            bank_date = b_tags[-1].text.strip()
+                            print("Bank Remitted Date found (fallback):", bank_date)
+                            break
+            except Exception as e:
+                print(f"Fallback search failed: {e}")
 
         print("Bank Remitted Date:", bank_date if bank_date else "Not found")
         return bank_date
@@ -147,11 +159,11 @@ def main():
         )
         send_whatsapp(message)
         update_status(True)
-        raise SystemExit(0)
+        raise SystemExit(0)   # success - stops all retries
     else:
         print("No Bank Remitted Date yet.")
         update_status(False)
-        raise SystemExit(1)
+        raise SystemExit(1)   # no date - triggers retry
 
 if __name__ == "__main__":
     main()
