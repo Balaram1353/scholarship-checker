@@ -49,7 +49,7 @@ def send_whatsapp(message):
 def is_month_end():
     today = datetime.now()
     last_day = calendar.monthrange(today.year, today.month)[1]
-    return today.day == last_day
+    return True
 
 # =========================================================
 # SAVE STATUS
