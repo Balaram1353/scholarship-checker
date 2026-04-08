@@ -8,6 +8,7 @@ from datetime import datetime
 import json
 import time
 import os
+import calendar
 
 # =========================================================
 # CONFIG
@@ -39,10 +40,11 @@ def send_whatsapp(message):
 # =========================================================
 # SAVE STATUS
 # =========================================================
-def update_status(found):
+def update_status(found, bank_date=""):
     data = {
         "last_checked": str(datetime.now()),
-        "found": found
+        "found": found,
+        "bank_date": bank_date
     }
     with open(STATUS_FILE, "w") as f:
         json.dump(data, f)
@@ -67,61 +69,40 @@ def check_status():
         print(f"Opening URL: {URL}")
         driver.get(URL)
 
-        print(f"Selecting year: {YEAR_VALUE}")
-        Select(wait.until(
-            EC.presence_of_element_located((By.ID, "ac_year"))
-        )).select_by_value(YEAR_VALUE)
+        # Select Year
+        Select(wait.until(EC.presence_of_element_located((By.ID, "ac_year")))).select_by_value(YEAR_VALUE)
 
-        print(f"Entering application number: {APPLICATION_NUMBER}")
-        app_input = wait.until(
-            EC.presence_of_element_located((By.ID, "applId"))
-        )
+        # Enter Application Number
+        app_input = wait.until(EC.presence_of_element_located((By.ID, "applId")))
         app_input.clear()
         app_input.send_keys(APPLICATION_NUMBER)
 
-        print("Clicking submit...")
+        # Submit
         driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
 
-        print("Waiting for results table...")
-        wait.until(
-            EC.presence_of_element_located(
-                (By.ID, "datatable-totals-withoutfooter_A4_new")
-            )
-        )
-
+        # Wait for results table
+        wait.until(EC.presence_of_element_located((By.ID, "datatable-totals-withoutfooter_A4_new")))
         time.sleep(2)
 
+        # Extract Bank Remitted Date
         bank_date = ""
-
-        # The HTML structure is:
-        # <td>Bank Remitted Date : <b>30-11-2022</b></td>
-        # So we find the <td> that contains "Bank Remitted Date"
-        # then get the <b> tag inside it
         try:
-            bank_date = driver.find_element(
-                By.XPATH,
-                "//td[contains(text(),'Bank Remitted Date')]/b"
-            ).text.strip()
-            print("Bank Remitted Date found:", bank_date)
+            bank_date = driver.find_element(By.XPATH, "//td[contains(text(),'Bank Remitted Date')]/b").text.strip()
         except:
-            # fallback - search all td elements for Bank Remitted Date text
-            try:
-                tds = driver.find_elements(By.TAG_NAME, "td")
-                for td in tds:
-                    if "Bank Remitted Date" in td.text:
-                        b_tags = td.find_elements(By.TAG_NAME, "b")
-                        if b_tags:
-                            bank_date = b_tags[-1].text.strip()
-                            print("Bank Remitted Date found (fallback):", bank_date)
-                            break
-            except Exception as e:
-                print(f"Fallback search failed: {e}")
+            # fallback
+            tds = driver.find_elements(By.TAG_NAME, "td")
+            for td in tds:
+                if "Bank Remitted Date" in td.text:
+                    b_tags = td.find_elements(By.TAG_NAME, "b")
+                    if b_tags:
+                        bank_date = b_tags[-1].text.strip()
+                        break
 
         print("Bank Remitted Date:", bank_date if bank_date else "Not found")
         return bank_date
 
     except Exception as e:
-        print(f"Scraper error: {e}")
+        print("Scraper error:", e)
         try:
             driver.save_screenshot("error_screenshot.png")
         except:
@@ -139,18 +120,15 @@ def main():
     print(f"Run started at: {datetime.now()}")
     print("=" * 50)
 
+    # Check secrets
     if not all([ACCOUNT_SID, AUTH_TOKEN, TO_WHATSAPP, APPLICATION_NUMBER]):
         print("ERROR: One or more required secrets are missing.")
-        print(f"  ACCOUNT_SID       : {'SET' if ACCOUNT_SID else 'MISSING'}")
-        print(f"  AUTH_TOKEN        : {'SET' if AUTH_TOKEN else 'MISSING'}")
-        print(f"  TO_WHATSAPP       : {'SET' if TO_WHATSAPP else 'MISSING'}")
-        print(f"  APPLICATION_NUMBER: {'SET' if APPLICATION_NUMBER else 'MISSING'}")
         raise SystemExit(1)
 
     bank_date = check_status()
 
-    if bank_date and bank_date.strip():
-        print("Bank Remitted Date found!")
+    if bank_date:
+        # Bank Remitted Date FOUND → send WhatsApp alert and stop retries
         message = (
             f"TGEPASS Scholarship Alert\n"
             f"Application: {APPLICATION_NUMBER}\n"
@@ -158,12 +136,20 @@ def main():
             f"Checked at: {datetime.now().strftime('%d-%m-%Y %I:%M %p')}"
         )
         send_whatsapp(message)
-        update_status(True)
-        raise SystemExit(0)   # success - stops all retries
+        update_status(True, bank_date)
+        raise SystemExit(0)  # SUCCESS
+
     else:
         print("No Bank Remitted Date yet.")
         update_status(False)
-        raise SystemExit(1)   # no date - triggers retry
+
+        # Check if today is month-end
+        today = datetime.now()
+        last_day = calendar.monthrange(today.year, today.month)[1]
+        if today.day == last_day:
+            send_whatsapp("Checked this month: No Bank Remitted Date generated")
+
+        raise SystemExit(1)  # triggers retry in GitHub Actions
 
 if __name__ == "__main__":
     main()
