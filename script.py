@@ -15,16 +15,14 @@ import os
 # =========================================================
 URL = "https://tgepass.cgg.gov.in/HomeServicePostmatricKnowApplication"
 
-# Use GitHub Secret
+# Secrets from GitHub
 APPLICATION_NUMBER = os.getenv("APPLICATION_NUMBER")
-
 YEAR_VALUE = "2021-22"
 
 # Twilio Secrets
 ACCOUNT_SID = os.getenv("ACCOUNT_SID")
 AUTH_TOKEN = os.getenv("AUTH_TOKEN")
 TO_WHATSAPP = os.getenv("TO_WHATSAPP")
-
 FROM_WHATSAPP = "whatsapp:+14155238886"
 
 STATUS_FILE = "status.json"
@@ -34,9 +32,7 @@ STATUS_FILE = "status.json"
 # =========================================================
 def send_whatsapp(message):
     client = Client(ACCOUNT_SID, AUTH_TOKEN)
-
     print("Sending WhatsApp Alert:", message)
-
     client.messages.create(
         from_=FROM_WHATSAPP,
         body=message,
@@ -49,7 +45,7 @@ def send_whatsapp(message):
 def is_month_end():
     today = datetime.now()
     last_day = calendar.monthrange(today.year, today.month)[1]
-    return True
+    return today.day == last_day
 
 # =========================================================
 # SAVE STATUS
@@ -71,8 +67,10 @@ def check_status():
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
 
-    driver = webdriver.Chrome(options=options)
+    # Use GitHub Actions Chromium
+    options.binary_location = "/usr/bin/chromium-browser"
 
+    driver = webdriver.Chrome(options=options)
     wait = WebDriverWait(driver, 20)
 
     try:
@@ -94,7 +92,7 @@ def check_status():
         submit_btn = driver.find_element(By.CSS_SELECTOR, "button[type='submit']")
         submit_btn.click()
 
-        # Wait for results
+        # Wait for results table
         wait.until(
             EC.presence_of_element_located(
                 (By.ID, "datatable-totals-withoutfooter_A4_new")
@@ -113,7 +111,6 @@ def check_status():
             bank_date = ""
 
         print("Bank Remitted Date:", bank_date)
-
         return bank_date
 
     except Exception as e:
@@ -140,7 +137,6 @@ def main():
     else:
         print("No remitted date yet")
         update_status(False)
-
         if is_month_end():
             message = "Checked this month: No Bank Remitted Date generated"
             send_whatsapp(message)
