@@ -2,8 +2,8 @@ name: Scholarship Checker
 
 on:
   schedule:
-    - cron: '30 18,19,20 * * *'   # Runs at 12 AM, 1 AM, 2 AM IST
-  workflow_dispatch:              # allows manual run
+    - cron: '30 18,19,20 * * *'
+  workflow_dispatch:
 
 jobs:
   run-script:
