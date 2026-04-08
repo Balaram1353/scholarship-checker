@@ -127,7 +127,7 @@ def main():
         print(f"  APPLICATION_NUMBER: {'SET' if APPLICATION_NUMBER else 'MISSING'}")
         raise SystemExit(1)
 
-    bank_date = 08-04-2026
+    bank_date = "08-04-2026"
 
     if bank_date and bank_date.strip():
         print("Bank Remitted Date found!")
