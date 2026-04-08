@@ -35,5 +35,5 @@ jobs:
           ACCOUNT_SID: ${{ secrets.ACCOUNT_SID }}
           AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
           TO_WHATSAPP: ${{ secrets.TO_WHATSAPP }}
-          APP_NUMBER: ${{ secrets.APP_NUMBER }}
+          APPLICATION_NUMBER: ${{ secrets.APPLICATION_NUMBER }}
         run: python script.py
