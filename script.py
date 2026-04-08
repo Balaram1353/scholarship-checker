@@ -15,20 +15,18 @@ import os
 # =========================================================
 URL = "https://tgepass.cgg.gov.in/HomeServicePostmatricKnowApplication"
 
-# Secrets from GitHub
 APPLICATION_NUMBER = os.getenv("APPLICATION_NUMBER")
 YEAR_VALUE = "2021-22"
 
-# Twilio Secrets
-ACCOUNT_SID = os.getenv("ACCOUNT_SID")
-AUTH_TOKEN = os.getenv("AUTH_TOKEN")
-TO_WHATSAPP = os.getenv("TO_WHATSAPP")
-FROM_WHATSAPP = "whatsapp:+14155238886"
+ACCOUNT_SID    = os.getenv("ACCOUNT_SID")
+AUTH_TOKEN     = os.getenv("AUTH_TOKEN")
+TO_WHATSAPP    = os.getenv("TO_WHATSAPP")
+FROM_WHATSAPP  = "whatsapp:+14155238886"
 
 STATUS_FILE = "status.json"
 
 # =========================================================
-# WHATSAPP ALERT FUNCTION
+# WHATSAPP ALERT
 # =========================================================
 def send_whatsapp(message):
     client = Client(ACCOUNT_SID, AUTH_TOKEN)
@@ -40,14 +38,6 @@ def send_whatsapp(message):
     )
 
 # =========================================================
-# CHECK MONTH END
-# =========================================================
-def is_month_end():
-    today = datetime.now()
-    last_day = calendar.monthrange(today.year, today.month)[1]
-    return True
-
-# =========================================================
 # SAVE STATUS
 # =========================================================
 def update_status(found):
@@ -57,42 +47,43 @@ def update_status(found):
     }
     with open(STATUS_FILE, "w") as f:
         json.dump(data, f)
+    print("Status saved:", data)
 
 # =========================================================
-# SCRAPER (HEADLESS SELENIUM)
+# SCRAPER
 # =========================================================
 def check_status():
     options = Options()
     options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-
-    # Use GitHub Actions Chromium
-    options.binary_location = "/usr/bin/chromium-browser"
+    options.add_argument("--disable-gpu")
+    options.add_argument("--window-size=1920,1080")
+    options.binary_location = "/usr/bin/google-chrome"
 
     driver = webdriver.Chrome(options=options)
     wait = WebDriverWait(driver, 20)
 
     try:
+        print(f"Opening URL: {URL}")
         driver.get(URL)
 
-        # Select Year
+        print(f"Selecting year: {YEAR_VALUE}")
         Select(wait.until(
             EC.presence_of_element_located((By.ID, "ac_year"))
         )).select_by_value(YEAR_VALUE)
 
-        # Enter Application Number
+        print(f"Entering application number: {APPLICATION_NUMBER}")
         app_input = wait.until(
             EC.presence_of_element_located((By.ID, "applId"))
         )
         app_input.clear()
         app_input.send_keys(APPLICATION_NUMBER)
 
-        # Submit
-        submit_btn = driver.find_element(By.CSS_SELECTOR, "button[type='submit']")
-        submit_btn.click()
+        print("Clicking submit...")
+        driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
 
-        # Wait for results table
+        print("Waiting for results table...")
         wait.until(
             EC.presence_of_element_located(
                 (By.ID, "datatable-totals-withoutfooter_A4_new")
@@ -101,7 +92,6 @@ def check_status():
 
         time.sleep(2)
 
-        # Extract Bank Remitted Date
         try:
             bank_date = driver.find_element(
                 By.XPATH,
@@ -110,39 +100,48 @@ def check_status():
         except:
             bank_date = ""
 
-        print("Bank Remitted Date:", bank_date)
+        print("Bank Remitted Date:", bank_date if bank_date else "Not found")
         return bank_date
 
     except Exception as e:
-        print("Error:", e)
-        return ""
+        print(f"Scraper error: {e}")
+        driver.save_screenshot("error_screenshot.png")
+        raise
 
     finally:
         driver.quit()
 
 # =========================================================
-# MAIN LOGIC
+# MAIN
 # =========================================================
 def main():
-    if not ACCOUNT_SID or not AUTH_TOKEN or not TO_WHATSAPP or not APPLICATION_NUMBER:
-        print("Missing required secrets")
-        return
+    print("=" * 50)
+    print(f"Run started at: {datetime.now()}")
+    print("=" * 50)
+
+    if not all([ACCOUNT_SID, AUTH_TOKEN, TO_WHATSAPP, APPLICATION_NUMBER]):
+        print("ERROR: One or more required secrets are missing.")
+        print(f"  ACCOUNT_SID       : {'SET' if ACCOUNT_SID else 'MISSING'}")
+        print(f"  AUTH_TOKEN        : {'SET' if AUTH_TOKEN else 'MISSING'}")
+        print(f"  TO_WHATSAPP       : {'SET' if TO_WHATSAPP else 'MISSING'}")
+        print(f"  APPLICATION_NUMBER: {'SET' if APPLICATION_NUMBER else 'MISSING'}")
+        raise SystemExit(1)
 
     bank_date = check_status()
 
     if bank_date and bank_date.strip():
-        message = f"Bank Remitted Date Generated: {bank_date}"
+        print("Bank Remitted Date found!")
+        message = (
+            f"TGEPASS Scholarship Alert\n"
+            f"Application: {APPLICATION_NUMBER}\n"
+            f"Bank Remitted Date: {bank_date}\n"
+            f"Checked at: {datetime.now().strftime('%d-%m-%Y %I:%M %p')}"
+        )
         send_whatsapp(message)
         update_status(True)
     else:
-        print("No remitted date yet")
+        print("No Bank Remitted Date yet.")
         update_status(False)
-        if is_month_end():
-            message = "Checked this month: No Bank Remitted Date generated"
-            send_whatsapp(message)
 
-# =========================================================
-# RUN
-# =========================================================
 if __name__ == "__main__":
     main()
