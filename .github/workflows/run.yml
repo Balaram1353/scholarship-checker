@@ -2,7 +2,7 @@ name: Scholarship Checker
 
 on:
   schedule:
-    - cron: '30 18 * * *'
+    - cron: '30 18 * * *'  # runs every day at 18:30 IST
   workflow_dispatch:
 
 jobs:
@@ -20,10 +20,10 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: pip install selenium twilio
 
-      - name: Install Chrome
+      - name: Install Chrome & chromedriver
         run: |
           sudo apt-get update
           sudo apt-get install -y wget gnupg
@@ -32,7 +32,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y google-chrome-stable
 
-      - name: "Attempt 1"
+          # Install matching chromedriver
+          CHROME_VERSION=$(google-chrome-stable --version | cut -d " " -f 3 | cut -d "." -f 1)
+          echo "Chrome major version: $CHROME_VERSION"
+          wget -N https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_VERSION -O /tmp/chromedriver_version.txt
+          CHROMEDRIVER_VERSION=$(cat /tmp/chromedriver_version.txt)
+          wget -N https://chromedriver.storage.googleapis.com/$CHROMEDRIVER_VERSION/chromedriver_linux64.zip
+          unzip -o chromedriver_linux64.zip
+          sudo mv -f chromedriver /usr/bin/chromedriver
+          sudo chmod +x /usr/bin/chromedriver
+
+      - name: Attempt 1
         id: attempt1
         continue-on-error: true
         env:
@@ -42,7 +52,7 @@ jobs:
           APPLICATION_NUMBER: ${{ secrets.APPLICATION_NUMBER }}
         run: python script.py
 
-      - name: "Wait 1hr -> Retry attempt 2"
+      - name: Wait 1hr → Retry attempt 2
         if: steps.attempt1.outcome == 'failure'
         id: attempt2
         continue-on-error: true
@@ -53,7 +63,7 @@ jobs:
           APPLICATION_NUMBER: ${{ secrets.APPLICATION_NUMBER }}
         run: sleep 3600 && python script.py
 
-      - name: "Wait 1hr -> Retry attempt 3"
+      - name: Wait 1hr → Retry attempt 3
         if: steps.attempt2.outcome == 'failure'
         id: attempt3
         continue-on-error: true
@@ -64,7 +74,7 @@ jobs:
           APPLICATION_NUMBER: ${{ secrets.APPLICATION_NUMBER }}
         run: sleep 3600 && python script.py
 
-      - name: "Wait 1hr -> Retry attempt 4 (final)"
+      - name: Wait 1hr → Retry attempt 4 (final)
         if: steps.attempt3.outcome == 'failure'
         env:
           ACCOUNT_SID: ${{ secrets.ACCOUNT_SID }}
