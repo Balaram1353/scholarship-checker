@@ -16,7 +16,7 @@ import os
 URL = "https://tgepass.cgg.gov.in/HomeServicePostmatricKnowApplication"
 
 # Use GitHub Secret
-APPLICATION_NUMBER = os.getenv("APP_NUMBER")
+APPLICATION_NUMBER = os.getenv("APPLICATION_NUMBER")
 
 YEAR_VALUE = "2021-22"
 
