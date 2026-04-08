@@ -2,14 +2,12 @@ name: Scholarship Checker
 
 on:
   schedule:
-    # Every day at 12 AM IST → convert to UTC: 18:30 UTC
-    - cron: '30 18 * * *'
+    - cron: '30 18 * * *'   # 12:00 AM IST
   workflow_dispatch:
 
 jobs:
   run-script:
     runs-on: ubuntu-latest
-
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -23,18 +21,55 @@ jobs:
           python-version: '3.10'
 
       - name: Install dependencies
-        run: |
-          pip install selenium twilio
+        run: pip install selenium twilio
 
-      - name: Install Chromium
+      # ✅ This is the correct way to install Chrome on ubuntu-latest
+      - name: Install Chrome
         run: |
           sudo apt-get update
-          sudo apt-get install -y chromium-browser chromium-chromedriver
+          sudo apt-get install -y wget gnupg
+          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+          sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list'
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable
 
-      - name: Run script
+      - name: "Attempt 1"
+        id: attempt1
+        continue-on-error: true
         env:
           ACCOUNT_SID: ${{ secrets.ACCOUNT_SID }}
           AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
           TO_WHATSAPP: ${{ secrets.TO_WHATSAPP }}
           APPLICATION_NUMBER: ${{ secrets.APPLICATION_NUMBER }}
         run: python script.py
+
+      - name: "Wait 1hr → Retry attempt 2"
+        if: steps.attempt1.outcome == 'failure'
+        id: attempt2
+        continue-on-error: true
+        env:
+          ACCOUNT_SID: ${{ secrets.ACCOUNT_SID }}
+          AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
+          TO_WHATSAPP: ${{ secrets.TO_WHATSAPP }}
+          APPLICATION_NUMBER: ${{ secrets.APPLICATION_NUMBER }}
+        run: sleep 3600 && python script.py
+
+      - name: "Wait 1hr → Retry attempt 3"
+        if: steps.attempt2.outcome == 'failure'
+        id: attempt3
+        continue-on-error: true
+        env:
+          ACCOUNT_SID: ${{ secrets.ACCOUNT_SID }}
+          AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
+          TO_WHATSAPP: ${{ secrets.TO_WHATSAPP }}
+          APPLICATION_NUMBER: ${{ secrets.APPLICATION_NUMBER }}
+        run: sleep 3600 && python script.py
+
+      - name: "Wait 1hr → Retry attempt 4 (final)"
+        if: steps.attempt3.outcome == 'failure'
+        env:
+          ACCOUNT_SID: ${{ secrets.ACCOUNT_SID }}
+          AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
+          TO_WHATSAPP: ${{ secrets.TO_WHATSAPP }}
+          APPLICATION_NUMBER: ${{ secrets.APPLICATION_NUMBER }}
+        run: sleep 3600 && python script.py
