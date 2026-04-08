@@ -2,31 +2,35 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select, WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
 from twilio.rest import Client
 from datetime import datetime
 import calendar
 import json
 import time
+import os
 
 # =========================================================
-# 🔧 CONFIG (FILL THESE)
+# CONFIG
 # =========================================================
 URL = "https://tgepass.cgg.gov.in/HomeServicePostmatricKnowApplication"
-APPLICATION_NUMBER = ""
+
+# Use GitHub Secret
+APPLICATION_NUMBER = os.getenv("APP_NUMBER")
+
 YEAR_VALUE = "2021-22"
 
-# Twilio Credentials
-ACCOUNT_SID = ""
-AUTH_TOKEN = ""
+# Twilio Secrets
+ACCOUNT_SID = os.getenv("ACCOUNT_SID")
+AUTH_TOKEN = os.getenv("AUTH_TOKEN")
+TO_WHATSAPP = os.getenv("TO_WHATSAPP")
 
-# WhatsApp numbers
-FROM_WHATSAPP = "whatsapp:+14155238886"   # Twilio sandbox number
-TO_WHATSAPP = "whatsapp:+91"    # Your number
+FROM_WHATSAPP = "whatsapp:+14155238886"
 
 STATUS_FILE = "status.json"
 
 # =========================================================
-#  WHATSAPP ALERT FUNCTION (TWILIO)
+# WHATSAPP ALERT FUNCTION
 # =========================================================
 def send_whatsapp(message):
     client = Client(ACCOUNT_SID, AUTH_TOKEN)
@@ -40,7 +44,7 @@ def send_whatsapp(message):
     )
 
 # =========================================================
-#  CHECK IF MONTH END
+# CHECK MONTH END
 # =========================================================
 def is_month_end():
     today = datetime.now()
@@ -59,33 +63,38 @@ def update_status(found):
         json.dump(data, f)
 
 # =========================================================
-# SCRAPE WEBSITE
+# SCRAPER (HEADLESS SELENIUM)
 # =========================================================
 def check_status():
-    driver = webdriver.Chrome()
-    driver.maximize_window()
-    driver.get(URL)
+    options = Options()
+    options.add_argument("--headless=new")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
 
-    wait = WebDriverWait(driver, 15)
+    driver = webdriver.Chrome(options=options)
+
+    wait = WebDriverWait(driver, 20)
 
     try:
-        # 1. Select Year
+        driver.get(URL)
+
+        # Select Year
         Select(wait.until(
             EC.presence_of_element_located((By.ID, "ac_year"))
         )).select_by_value(YEAR_VALUE)
 
-        # 2. Enter Application Number
+        # Enter Application Number
         app_input = wait.until(
             EC.presence_of_element_located((By.ID, "applId"))
         )
         app_input.clear()
         app_input.send_keys(APPLICATION_NUMBER)
 
-        # 3. Submit
+        # Submit
         submit_btn = driver.find_element(By.CSS_SELECTOR, "button[type='submit']")
         submit_btn.click()
 
-        # 4. Wait for result page
+        # Wait for results
         wait.until(
             EC.presence_of_element_located(
                 (By.ID, "datatable-totals-withoutfooter_A4_new")
@@ -94,7 +103,7 @@ def check_status():
 
         time.sleep(2)
 
-        # 5. Extract Bank Remitted Date
+        # Extract Bank Remitted Date
         try:
             bank_date = driver.find_element(
                 By.XPATH,
@@ -118,25 +127,26 @@ def check_status():
 # MAIN LOGIC
 # =========================================================
 def main():
+    if not ACCOUNT_SID or not AUTH_TOKEN or not TO_WHATSAPP or not APPLICATION_NUMBER:
+        print("Missing required secrets")
+        return
+
     bank_date = check_status()
 
-    if bank_date:
-        # Found → send alert immediately
+    if bank_date and bank_date.strip():
         message = f"Bank Remitted Date Generated: {bank_date}"
         send_whatsapp(message)
         update_status(True)
-
     else:
         print("No remitted date yet")
         update_status(False)
 
-        # Month-end message
         if is_month_end():
-            message = "⚠️ Checked this month: No Bank Remitted Date generated"
+            message = "Checked this month: No Bank Remitted Date generated"
             send_whatsapp(message)
 
 # =========================================================
-# RUN SCRIPT
+# RUN
 # =========================================================
 if __name__ == "__main__":
     main()
