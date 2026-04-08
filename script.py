@@ -91,6 +91,12 @@ def check_status():
 
         time.sleep(2)
 
+        # DEBUG - confirm XPATH is matching correctly
+        elements = driver.find_elements(By.XPATH, "//td[contains(text(),'Bank Remitted Date')]/b")
+        print("Matched elements count:", len(elements))
+        for el in elements:
+            print("Found text:", el.text)
+
         try:
             bank_date = driver.find_element(
                 By.XPATH,
@@ -129,7 +135,7 @@ def main():
         print(f"  APPLICATION_NUMBER: {'SET' if APPLICATION_NUMBER else 'MISSING'}")
         raise SystemExit(1)
 
-    bank_date = check_status()      # <-- THIS LINE, do not hardcode anything here
+    bank_date = check_status()
 
     if bank_date and bank_date.strip():
         print("Bank Remitted Date found!")
@@ -141,11 +147,11 @@ def main():
         )
         send_whatsapp(message)
         update_status(True)
-        raise SystemExit(0)    # date found - workflow stops all retries
+        raise SystemExit(0)
     else:
         print("No Bank Remitted Date yet.")
         update_status(False)
-        raise SystemExit(1)    # no date - workflow retries after 1 hour
+        raise SystemExit(1)
 
 if __name__ == "__main__":
     main()
