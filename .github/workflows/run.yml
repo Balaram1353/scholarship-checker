@@ -2,7 +2,7 @@ name: Scholarship Checker
 
 on:
   schedule:
-    - cron: '30 18,19,20 * * *'
+    - cron: '30 18,19,20 * * *'   # 12 AM, 1 AM, 2 AM IST
   workflow_dispatch:
 
 jobs:
@@ -11,10 +11,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
@@ -28,4 +28,9 @@ jobs:
           sudo apt-get install -y chromium-browser chromium-chromedriver
 
       - name: Run script
+        env:
+          ACCOUNT_SID: ${{ secrets.ACCOUNT_SID }}
+          AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
+          TO_WHATSAPP: ${{ secrets.TO_WHATSAPP }}
+          APP_NUMBER: ${{ secrets.APP_NUMBER }}
         run: python script.py
