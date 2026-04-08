@@ -5,7 +5,6 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from twilio.rest import Client
 from datetime import datetime
-import calendar
 import json
 import time
 import os
@@ -18,10 +17,10 @@ URL = "https://tgepass.cgg.gov.in/HomeServicePostmatricKnowApplication"
 APPLICATION_NUMBER = os.getenv("APPLICATION_NUMBER")
 YEAR_VALUE = "2021-22"
 
-ACCOUNT_SID    = os.getenv("ACCOUNT_SID")
-AUTH_TOKEN     = os.getenv("AUTH_TOKEN")
-TO_WHATSAPP    = os.getenv("TO_WHATSAPP")
-FROM_WHATSAPP  = "whatsapp:+14155238886"
+ACCOUNT_SID   = os.getenv("ACCOUNT_SID")
+AUTH_TOKEN    = os.getenv("AUTH_TOKEN")
+TO_WHATSAPP   = os.getenv("TO_WHATSAPP")
+FROM_WHATSAPP = "whatsapp:+14155238886"
 
 STATUS_FILE = "status.json"
 
@@ -105,8 +104,11 @@ def check_status():
 
     except Exception as e:
         print(f"Scraper error: {e}")
-        driver.save_screenshot("error_screenshot.png")
-        raise
+        try:
+            driver.save_screenshot("error_screenshot.png")
+        except:
+            pass
+        return ""   # return empty string, do not raise
 
     finally:
         driver.quit()
@@ -139,9 +141,11 @@ def main():
         )
         send_whatsapp(message)
         update_status(True)
+        raise SystemExit(0)   # success - stops all retries
     else:
         print("No Bank Remitted Date yet.")
         update_status(False)
+        raise SystemExit(1)   # triggers retry in workflow
 
 if __name__ == "__main__":
     main()
